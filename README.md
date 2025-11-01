@@ -52,8 +52,3 @@ You can download these files from your Firebase Console project settings.
 flutter run
 ```
 
-## Security Notes
-
-- Never commit `.env` file or Firebase configuration files
-- All API keys should be stored in environment variables
-- Template files (`.example`) are safe to commit
