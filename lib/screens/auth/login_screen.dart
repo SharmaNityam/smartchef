@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:smartchef/screens/home_screen.dart';
 import 'package:smartchef/services/auth_service.dart';
 
+import 'phone_auth_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -209,6 +210,31 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Text(
                     'Continue as Guest',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+
+                SizedBox(height: 16),
+
+                // Sign in with Phone Button
+                OutlinedButton.icon(
+                  onPressed: _isLoading
+                      ? null
+                      : () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PhoneAuthScreen(),
+                            ),
+                          );
+                        },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: Size(double.infinity, 50),
+                    side: BorderSide(color: Theme.of(context).primaryColor),
+                  ),
+                  icon: Icon(Icons.phone_outlined),
+                  label: Text(
+                    'Sign in with Phone',
                     style: TextStyle(fontSize: 16),
                   ),
                 ),

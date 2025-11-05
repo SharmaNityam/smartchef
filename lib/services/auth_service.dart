@@ -198,6 +198,7 @@ class AuthService extends ChangeNotifier {
   Future<UserModel?> _handleUserAuthSuccess(
     User? user, {
     String? displayName,
+    String? phoneNumber,
   }) async {
     if (user == null) return null;
 
@@ -208,6 +209,7 @@ class AuthService extends ChangeNotifier {
         displayName: displayName ?? user.displayName,
         photoUrl: user.photoURL,
         isAnonymous: user.isAnonymous,
+        phoneNumber: phoneNumber,
       );
 
       await _firestore.collection('users').doc(user.uid).set(userData);
@@ -224,12 +226,14 @@ class AuthService extends ChangeNotifier {
     String? displayName,
     String? photoUrl,
     bool isAnonymous = false,
+    String? phoneNumber,
   }) {
     return {
       'uid': uid,
       'email': email ?? '',
       'displayName': displayName ?? (isAnonymous ? 'Guest User' : 'New User'),
       'photoUrl': photoUrl,
+      'phoneNumber': phoneNumber,
       'favorites': FieldValue.arrayUnion([]),
       'myRecipes': FieldValue.arrayUnion([]),
       'createdAt': FieldValue.serverTimestamp(),
@@ -292,5 +296,83 @@ class AuthService extends ChangeNotifier {
     if (value is FieldValue)
       return []; // FieldValue can't be converted directly
     return [];
+  }
+
+  // Phone Authentication Methods
+  Future<void> verifyPhoneNumber({
+    required String phoneNumber,
+    required Function(String verificationId) onCodeSent,
+    required Function(String error) onError,
+    required Function() onVerificationCompleted,
+  }) async {
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          try {
+            await _auth.signInWithCredential(credential);
+            onVerificationCompleted();
+          } catch (e) {
+            onError(e.toString());
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          onError(e.message ?? 'Verification failed');
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          onCodeSent(verificationId);
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Auto-retrieval timeout, verificationId can be stored for manual entry
+        },
+        timeout: const Duration(seconds: 60),
+      );
+    } catch (e) {
+      onError(e.toString());
+    }
+  }
+
+  Future<UserModel?> signInWithPhoneCredential({
+    required String verificationId,
+    required String smsCode,
+  }) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+
+      if (user != null) {
+        // Check if user document exists
+        final userDoc = await _firestore
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          // Update phone number if it's not set
+          if (user.phoneNumber != null) {
+            await _firestore
+                .collection('users')
+                .doc(user.uid)
+                .update({'phoneNumber': user.phoneNumber});
+          }
+          return UserModel.fromJson(_convertFirestoreDoc(userDoc));
+        } else {
+          // Create new user document
+          return await _handleUserAuthSuccess(
+            user,
+            phoneNumber: user.phoneNumber,
+          );
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error signing in with phone credential: $e');
+      rethrow;
+    }
   }
 }
